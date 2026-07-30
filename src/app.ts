@@ -1,8 +1,9 @@
 import cors from "cors";
-import express, { Application, Request, Response } from "express";
+import express, { Application } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
+import routes from "./routes/index.js";
 
 export function createApp(): Application {
   const app = express();
@@ -18,9 +19,7 @@ export function createApp(): Application {
     );
   }
 
-  app.get("/", (_req: Request, res: Response) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
-  });
+  app.use(routes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

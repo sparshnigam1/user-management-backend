@@ -4,7 +4,7 @@ dotenv.config();
 import { createApp } from "./app.js";
 import { checkDbConnection, pool } from "./config/db.js";
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 3001;
 
 async function start(): Promise<void> {
   try {
