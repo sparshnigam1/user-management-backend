@@ -92,7 +92,7 @@ export const authController = {
         is_locked: user?.is_locked,
       };
 
-      res.status(201).json({ message: "Login successful", user: parsedUser });
+      res.status(200).json({ message: "Login successful", user: parsedUser });
     } catch (error: any) {
       console.error(error);
       res.status(500).json({ message: "Something went wrong during login" });

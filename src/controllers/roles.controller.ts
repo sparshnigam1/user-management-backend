@@ -11,7 +11,7 @@ export const rolesController = {
           .json({ message: "Something went wrong during fetching roles" });
       }
       if (!!roles && roles?.length) {
-        res.status(201).json({ status: "ok", roles });
+        res.status(200).json({ status: "ok", roles });
       }
     } catch (error: any) {
       console.error(error);
