@@ -35,7 +35,54 @@ export interface UpdateUserInput {
   is_locked?: boolean;
 }
 
+const ALLOWED_FIND_COLUMNS = [
+  "id",
+  "role_id",
+  "first_name",
+  "last_name",
+  "email_id",
+  "phone_number",
+  "password",
+  "gender",
+  "created_at",
+  "updated_at",
+  "is_locked",
+] as const;
+
+type FindableColumn = (typeof ALLOWED_FIND_COLUMNS)[number];
+
+type FindParams = Partial<Record<FindableColumn, string | boolean>>;
+
 export const UserModel = {
+  async findAll(): Promise<User[] | undefined> {
+    const result = await query<User>(`SELECT * FROM users`);
+
+    return result.rows;
+  },
+
+  async findOne(param: FindParams): Promise<User | undefined> {
+    const entries = Object.entries(param).filter(([key]) =>
+      ALLOWED_FIND_COLUMNS.includes(key as FindableColumn),
+    );
+
+    if (entries.length === 0) {
+      throw new Error("find() requires at least one valid field to match on");
+    }
+
+    const whereClause = entries
+      .map(([key], index) => `${key} = $${index + 1}`)
+      .join(" AND ");
+
+    const values = entries.map(([, value]) => value);
+
+    const result = await query<User>(
+      `SELECT * FROM users WHERE ${whereClause} LIMIT 1`,
+      values,
+    );
+
+    return result.rows[0];
+  },
+
   async create({
     role_id,
     first_name,
