@@ -1,4 +1,4 @@
-import { authController } from "@/controllers/auth.controller.js";
+import { authController } from "@/controllers/auth/auth.controller.js";
 import { asyncHandler } from "@/middlewares/asyncHandler.js";
 import { Router } from "express";
 

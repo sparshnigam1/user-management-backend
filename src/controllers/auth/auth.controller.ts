@@ -1,6 +1,7 @@
+import { SignupRequestBody, signupSchema } from "@/controllers/auth/schema.js";
+import { hashPassword } from "@/helpers/authHelper.js";
 import { ROLES_ENUM, RolesModel } from "@/models/roles.model.js";
 import { UserModel } from "@/models/users.model.js";
-import { SignupRequestBody, signupSchema } from "@/routes/auth/schema.js";
 import { Request, Response } from "express";
 
 export const authController = {
@@ -27,7 +28,12 @@ export const authController = {
         return;
       }
 
-      const userFormattedReqBody = { ...input, role_id: customerRole.id };
+      const hashedPassword = await hashPassword(input.password);
+      const userFormattedReqBody = {
+        ...input,
+        password: hashedPassword,
+        role_id: customerRole.id,
+      };
       const user = await UserModel.create(userFormattedReqBody);
 
       res.status(201).json({ message: "Signup successful", user });
