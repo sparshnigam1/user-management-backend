@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Application } from "express";
 import helmet from "helmet";
@@ -9,8 +10,15 @@ export function createApp(): Application {
   const app = express();
 
   app.use(helmet());
-  app.use(cors());
+  app.use(
+    cors(),
+    //   {
+    //   origin: process.env.FRONTEND_BASE_URL,
+    //   credentials: true,
+    // }
+  );
   app.use(express.json());
+  app.use(cookieParser());
   app.use(express.urlencoded({ extended: true }));
 
   if (process.env.NODE_ENV !== "test") {

@@ -1,4 +1,4 @@
-import { E164_REGEX } from "@/utils/constants/index.js";
+import { E164_REGEX } from "@/constants/index.js";
 import z from "zod";
 
 export const signupSchema = z.object({

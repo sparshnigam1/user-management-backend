@@ -1,11 +1,17 @@
+import { jwtConfig, requireEnv } from "@/config/index.js";
 import {
   loginSchema,
   SignupRequestBody,
   signupSchema,
 } from "@/controllers/auth/schema.js";
-import { hashPassword, verifyPassword } from "@/helpers/authHelper.js";
+import {
+  createToken,
+  hashPassword,
+  verifyPassword,
+} from "@/helpers/authHelper.js";
 import { ROLES_ENUM, RolesModel } from "@/models/roles.model.js";
 import { UserModel } from "@/models/users.model.js";
+import { expiresInToMs, getSessionCookieOptions } from "@/utils/cookies.js";
 import { Request, Response } from "express";
 
 export const authController = {
@@ -92,10 +98,23 @@ export const authController = {
         is_locked: user?.is_locked,
       };
 
-      res.status(200).json({ message: "Login successful", user: parsedUser });
+      const cookieName = requireEnv("COOKIE_KEY");
+      const token = createToken({ user: user?.email_id, role: user?.role_id });
+      const tokenMaxAge = expiresInToMs(jwtConfig.jwtExpiresIn);
+
+      res.cookie(cookieName, token, getSessionCookieOptions(tokenMaxAge));
+      res
+        .status(200)
+        .json({ message: "Login successful", user: parsedUser, token });
     } catch (error: any) {
       console.error(error);
       res.status(500).json({ message: "Something went wrong during login" });
     }
+  },
+
+  async logout(req: Request, res: Response): Promise<void> {
+    const sessionCookieName = requireEnv("COOKIE_KEY");
+    res.clearCookie(sessionCookieName, { path: "/" });
+    res.status(200).json({ message: "Logout successful" });
   },
 };
