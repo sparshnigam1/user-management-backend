@@ -12,6 +12,8 @@ export interface User {
   created_at: string;
   updated_at: string;
   is_locked: boolean;
+  otp?: string | null;
+  otp_expiry?: string | null;
 }
 
 export interface CreateUserInput {
@@ -52,6 +54,29 @@ const ALLOWED_FIND_COLUMNS = [
 type FindableColumn = (typeof ALLOWED_FIND_COLUMNS)[number];
 
 type FindParams = Partial<Record<FindableColumn, string | boolean>>;
+
+const ALLOWED_UPDATE_COLUMNS = [
+  "role_id",
+  "first_name",
+  "last_name",
+  "email_id",
+  "phone_number",
+  "password",
+  "gender",
+  "updated_at",
+  "is_locked",
+  "otp",
+  "otp_expiry",
+] as const;
+
+type UpdateableColumn = (typeof ALLOWED_UPDATE_COLUMNS)[number];
+
+type UpdateParams = Partial<
+  Record<
+    Exclude<UpdateableColumn, "updated_at">,
+    string | boolean | Date | null
+  >
+>;
 
 export const UserModel = {
   async findAll(): Promise<User[] | undefined> {
@@ -106,6 +131,34 @@ export const UserModel = {
         gender ?? null,
       ],
     );
+    return result.rows[0];
+  },
+
+  async update(id: number, param: UpdateParams): Promise<User | undefined> {
+    const entries = Object.entries(param).filter(
+      ([key, value]) =>
+        ALLOWED_UPDATE_COLUMNS.includes(key as UpdateableColumn) &&
+        value !== undefined,
+    );
+
+    if (entries.length === 0) {
+      throw new Error("update() requires at least one valid field to match on");
+    }
+
+    const setClause = entries
+      .map(([key], index) => `${key} = $${index + 1}`)
+      .join(", ");
+
+    const values = entries.map(([, value]) => value);
+
+    const result = await query<User>(
+      `UPDATE users
+     SET ${setClause}, updated_at = NOW()
+     WHERE id = $${entries.length + 1}
+     RETURNING id, role_id, first_name, last_name, email_id, phone_number, gender, created_at, updated_at, is_locked, otp, otp_expiry`,
+      [...values, id],
+    );
+
     return result.rows[0];
   },
 };

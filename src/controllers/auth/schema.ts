@@ -19,7 +19,6 @@ export const signupSchema = z.object({
   // .regex(/[a-z]/, "Password must contain at least one lowercase letter")
   // .regex(/[0-9]/, "Password must contain at least one number"),
 });
-
 export type SignupRequestBody = z.infer<typeof signupSchema>;
 
 export const loginSchema = z.object({
@@ -29,8 +28,26 @@ export const loginSchema = z.object({
   // .regex(/[a-z]/, "Password must contain at least one lowercase letter")
   // .regex(/[0-9]/, "Password must contain at least one number"),
 });
-
 export type LoginRequestBody = z.infer<typeof loginSchema>;
+
+export const forgetPasswordSchema = z.object({
+  email_id: z.string().trim().toLowerCase().email("Invalid email address"),
+});
+export type forgetPasswordRequestBody = z.infer<typeof forgetPasswordSchema>;
+
+export const verifyForgetPassOTPSchema = z.object({
+  otp: z.string().trim().min(6, "OTP must be 6 digits"),
+  user: z.string().trim().toLowerCase().email("Invalid user"),
+});
+export type verifyForgetPassOTPRequestBody = z.infer<
+  typeof verifyForgetPassOTPSchema
+>;
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  user: z.string().trim().toLowerCase().email("Invalid user"),
+});
+export type resetPasswordRequestBody = z.infer<typeof resetPasswordSchema>;
 
 // Response Schema
 // export const SignupUserResponseBodySchema = z.object({

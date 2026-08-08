@@ -62,3 +62,12 @@ export const reIssueToken = (decodedToken: JwtPayload): string => {
   const payload = stripReservedClaims(decodedToken);
   return createToken(payload);
 };
+
+export const generateOtp = (length = 6): string => {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let otp = "";
+  for (let i = 0; i < length; i++) {
+    otp += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return otp;
+};

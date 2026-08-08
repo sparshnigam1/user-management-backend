@@ -1,14 +1,21 @@
 import { jwtConfig, requireEnv } from "@/config/index.js";
 import {
+  forgetPasswordSchema,
   loginSchema,
+  resetPasswordRequestBody,
+  resetPasswordSchema,
   SignupRequestBody,
   signupSchema,
+  verifyForgetPassOTPSchema,
 } from "@/controllers/auth/schema.js";
 import {
   createToken,
+  generateOtp,
   hashPassword,
   verifyPassword,
 } from "@/helpers/authHelper.js";
+import { passwordResetSuccessEmail, sendOtpEmail } from "@/lib/email/index.js";
+import { HttpStatus } from "@/lib/http/status.js";
 import { ROLES_ENUM, RolesModel } from "@/models/roles.model.js";
 import { UserModel } from "@/models/users.model.js";
 import { expiresInToMs, getSessionCookieOptions } from "@/utils/cookies.js";
@@ -19,7 +26,7 @@ export const authController = {
     const result = signupSchema.safeParse(req.body);
 
     if (!result.success) {
-      res.status(400).json({
+      res.status(HttpStatus.BAD_REQUEST).json({
         message: "Validation failed",
         errors: result.error.flatten().fieldErrors,
       });
@@ -34,7 +41,9 @@ export const authController = {
         ({ name }) => name === ROLES_ENUM.CUSTOMER,
       );
       if (!customerRole) {
-        res.status(500).json({ message: "Customer role is not configured" });
+        res
+          .status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .json({ message: "Customer role is not configured" });
         return;
       }
 
@@ -46,10 +55,14 @@ export const authController = {
       };
       const user = await UserModel.create(userFormattedReqBody);
 
-      res.status(201).json({ message: "Signup successful", user });
+      res
+        .status(HttpStatus.CREATED)
+        .json({ message: "Signup successful", user });
     } catch (error: any) {
       console.error(error);
-      res.status(500).json({ message: "Something went wrong during signup" });
+      res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .json({ message: "Something went wrong during signup" });
     }
   },
 
@@ -57,7 +70,7 @@ export const authController = {
     const result = loginSchema.safeParse(req.body);
 
     if (!result.success) {
-      res.status(400).json({
+      res.status(HttpStatus.BAD_REQUEST).json({
         message: "Validation failed",
         errors: result.error.flatten().fieldErrors,
       });
@@ -69,7 +82,7 @@ export const authController = {
       });
 
       if (!user) {
-        res.status(400).json({
+        res.status(HttpStatus.BAD_REQUEST).json({
           message: "Invalid eamil id",
         });
       }
@@ -80,7 +93,7 @@ export const authController = {
       );
 
       if (!isPassword) {
-        res.status(400).json({
+        res.status(HttpStatus.BAD_REQUEST).json({
           message: "Invalid eamil or password",
         });
       }
@@ -104,11 +117,13 @@ export const authController = {
 
       res.cookie(cookieName, token, getSessionCookieOptions(tokenMaxAge));
       res
-        .status(200)
+        .status(HttpStatus.OK)
         .json({ message: "Login successful", user: parsedUser, token });
     } catch (error: any) {
       console.error(error);
-      res.status(500).json({ message: "Something went wrong during login" });
+      res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .json({ message: "Something went wrong during login" });
     }
   },
 
@@ -116,5 +131,170 @@ export const authController = {
     const sessionCookieName = requireEnv("COOKIE_KEY");
     res.clearCookie(sessionCookieName, { path: "/" });
     res.status(200).json({ message: "Logout successful" });
+  },
+
+  async forgetPassword(req: Request, res: Response): Promise<void> {
+    const result = forgetPasswordSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Validation failed",
+        error: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    try {
+      const user = await UserModel.findOne({
+        email_id: req.body.email_id,
+      });
+
+      if (!user) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "Invalid email id",
+        });
+        return;
+      }
+
+      const otp = generateOtp(6);
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+
+      const updatedUser = await UserModel.update(user.id, {
+        otp: otp,
+        otp_expiry: otpExpiry,
+      });
+
+      if (!updatedUser) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          status: false,
+          message: "Something went wrong. OTP generation failed.",
+        });
+        return;
+      }
+
+      await sendOtpEmail(updatedUser.email_id, otp);
+
+      res.status(HttpStatus.OK).json({
+        status: true,
+        message: "OTP sent to your registered email id",
+        user: updatedUser.email_id,
+      });
+    } catch (error: any) {
+      console.error(error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: "Something went wrong, please try again after sometime",
+      });
+    }
+  },
+
+  async verifyForgetPassOTP(req: Request, res: Response): Promise<void> {
+    const result = verifyForgetPassOTPSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Validation failed",
+        error: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    try {
+      const user = await UserModel.findOne({
+        email_id: req.body.user,
+      });
+
+      if (!user) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "Invalid user",
+        });
+        return;
+      }
+
+      if (!user.otp == req.body.otp) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          status: false,
+          message: "Invalid OTP",
+        });
+        return;
+      }
+
+      if (!user.otp_expiry || new Date(user.otp_expiry) < new Date()) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "OTP has expired",
+        });
+        return;
+      }
+
+      res.status(HttpStatus.OK).json({
+        status: true,
+        message: "success",
+      });
+    } catch (error: any) {
+      console.error(error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: "Something went wrong, please try again after sometime",
+      });
+    }
+  },
+
+  async resetPassword(req: Request, res: Response): Promise<void> {
+    const result = resetPasswordSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Validation failed",
+        error: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const input: resetPasswordRequestBody = result.data;
+
+    try {
+      const user = await UserModel.findOne({
+        email_id: req.body.user,
+      });
+
+      if (!user) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "Invalid user",
+        });
+        return;
+      }
+      const hashedPassword = await hashPassword(input.password);
+      const updateBody = {
+        password: hashedPassword,
+        otp: null,
+        otp_expiry: null,
+      };
+
+      const updatedUser = await UserModel.update(user.id, { ...updateBody });
+
+      if (!updatedUser) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          status: false,
+          message: "Something went wrong. Password reset failed.",
+        });
+        return;
+      }
+
+      await passwordResetSuccessEmail(updatedUser.email_id);
+
+      res
+        .status(HttpStatus.CREATED)
+        .json({ status: true, message: "Password reset successful" });
+    } catch (error: any) {
+      console.error(error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: "Something went wrong, please try again after sometime",
+      });
+    }
   },
 };

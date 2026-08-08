@@ -59,23 +59,32 @@ export const authenticate = (
     res.clearCookie(sessionCookieName, { path: "/" });
 
     if (error.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Token expired" });
+      return res
+        .status(401)
+        .json({ status: false, message: "Session expired" });
     }
     if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ error: "Invalid token" });
+      return res
+        .status(401)
+        .json({ status: false, message: "Invalid session" });
     }
     // if (error.name === "NotBeforeError") {
-    //   return res.status(401).json({ error: "Token not active yet" });
+    //   return res.status(401).json({ status: false, message: "Token not active yet" });
     // }
 
-    return res.status(401).json({ error: "Token validation failed" });
+    return res.status(401).json({ error: "Session validation failed" });
   }
 };
 
 export const authorize = (...allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.session) {
-      return res.status(401).json({ error: "Not authenticated" });
+      return res
+        .status(401)
+        .json({
+          status: false,
+          message: "Unauthenticated Access - Access Denied",
+        });
     }
 
     const role = req.session.role as string | undefined;
