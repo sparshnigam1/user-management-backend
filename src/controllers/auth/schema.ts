@@ -49,6 +49,11 @@ export const resetPasswordSchema = z.object({
 });
 export type resetPasswordRequestBody = z.infer<typeof resetPasswordSchema>;
 
+export const resendOTPSchema = z.object({
+  user: z.string().trim().toLowerCase().email("Invalid email address"),
+});
+export type resendOTPRequestBody = z.infer<typeof resendOTPSchema>;
+
 // Response Schema
 // export const SignupUserResponseBodySchema = z.object({
 //   message: z.string(),

@@ -1,3 +1,4 @@
+export {};
 // CREATE TABLE users (
 //     id             UUID PRIMARY KEY DEFAULT uuidv7(),
 //     role_id        UUID NOT NULL REFERENCES roles(id),
@@ -11,3 +12,4 @@
 //     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
 //     is_locked      BOOLEAN NOT NULL DEFAULT false
 // );
+//# sourceMappingURL=users.migration.js.map

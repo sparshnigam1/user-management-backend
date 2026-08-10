@@ -16,5 +16,18 @@ authRoutes.post(
   asyncHandler(authController.verifyForgetPassOTP),
 );
 authRoutes.post("/reset-password", asyncHandler(authController.resetPassword));
+authRoutes.post(
+  "/resend-reset-otp",
+  asyncHandler(authController.resendOTP("reset")),
+);
+authRoutes.post("/otp-login", asyncHandler(authController.otpLogin));
+authRoutes.post(
+  "/verify-otp-login",
+  asyncHandler(authController.verifyLoginOTP),
+);
+authRoutes.post(
+  "/resend-login-otp",
+  asyncHandler(authController.resendOTP("login")),
+);
 
 export default authRoutes;

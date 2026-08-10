@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export const sendOtpEmail = async (
+export const sendPasswordResetOtpEmail = async (
   email: string,
   otp: string,
 ): Promise<void> => {
@@ -38,6 +38,21 @@ export const passwordResetSuccessEmail = async (
     subject: "Password Reset Successful",
     html: `
       <p>This password has been reset. Login and continue withe application.</p>
+    `,
+  });
+};
+
+export const otpLoginEmail = async (
+  email: string,
+  otp: string,
+): Promise<void> => {
+  await transporter.sendMail({
+    from: `"E-commerce" <${requireEnv("SMTP_FROM") || requireEnv("SMTP_USER")}>`,
+    to: email,
+    subject: "Login OTP",
+    html: `
+      <p>Your OTP is: <strong>${otp}</strong></p>
+      <p>This OTP will expire in 10 minutes. If you didn't request this, please ignore this email.</p>
     `,
   });
 };

@@ -2,6 +2,7 @@ import { jwtConfig, requireEnv } from "@/config/index.js";
 import {
   forgetPasswordSchema,
   loginSchema,
+  resendOTPSchema,
   resetPasswordRequestBody,
   resetPasswordSchema,
   SignupRequestBody,
@@ -14,12 +15,16 @@ import {
   hashPassword,
   verifyPassword,
 } from "@/helpers/authHelper.js";
-import { passwordResetSuccessEmail, sendOtpEmail } from "@/lib/email/index.js";
+import {
+  otpLoginEmail,
+  passwordResetSuccessEmail,
+  sendPasswordResetOtpEmail,
+} from "@/lib/email/index.js";
 import { HttpStatus } from "@/lib/http/status.js";
 import { ROLES_ENUM, RolesModel } from "@/models/roles.model.js";
 import { UserModel } from "@/models/users.model.js";
 import { expiresInToMs, getSessionCookieOptions } from "@/utils/cookies.js";
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 
 export const authController = {
   async signup(req: Request, res: Response): Promise<void> {
@@ -174,7 +179,7 @@ export const authController = {
         return;
       }
 
-      await sendOtpEmail(updatedUser.email_id, otp);
+      await sendPasswordResetOtpEmail(updatedUser.email_id, otp);
 
       res.status(HttpStatus.OK).json({
         status: true,
@@ -214,7 +219,7 @@ export const authController = {
         return;
       }
 
-      if (!user.otp == req.body.otp) {
+      if (user.otp == req.body.otp) {
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
           status: false,
           message: "Invalid OTP",
@@ -296,5 +301,172 @@ export const authController = {
         message: "Something went wrong, please try again after sometime",
       });
     }
+  },
+
+  async otpLogin(req: Request, res: Response): Promise<void> {
+    const result = forgetPasswordSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Validation failed",
+        error: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    try {
+      const user = await UserModel.findOne({
+        email_id: req.body.email_id,
+      });
+
+      if (!user) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "Invalid email id",
+        });
+        return;
+      }
+
+      const otp = generateOtp(6);
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+
+      const updatedUser = await UserModel.update(user.id, {
+        otp: otp,
+        otp_expiry: otpExpiry,
+      });
+
+      if (!updatedUser) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          status: false,
+          message: "Something went wrong. OTP generation failed.",
+        });
+        return;
+      }
+
+      await otpLoginEmail(updatedUser.email_id, otp);
+
+      res.status(HttpStatus.OK).json({
+        status: true,
+        message: "OTP sent to your registered email id",
+        user: updatedUser.email_id,
+      });
+    } catch (error: any) {
+      console.error(error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: "Something went wrong, please try again after sometime",
+      });
+    }
+  },
+
+  async verifyLoginOTP(req: Request, res: Response): Promise<void> {
+    const result = verifyForgetPassOTPSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Validation failed",
+        error: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    try {
+      const user = await UserModel.findOne({
+        email_id: req.body.user,
+      });
+
+      if (!user) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "Invalid user",
+        });
+        return;
+      }
+
+      if (user.otp !== req.body.otp) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          status: false,
+          message: "Invalid OTP",
+        });
+        return;
+      }
+
+      if (!user.otp_expiry || new Date(user.otp_expiry) < new Date()) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "OTP has expired",
+        });
+        return;
+      }
+
+      res.status(HttpStatus.OK).json({
+        status: true,
+        message: "login successful",
+      });
+    } catch (error: any) {
+      console.error(error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: "Something went wrong, please try again after sometime",
+      });
+    }
+  },
+
+  resendOTP(type: "reset" | "login") {
+    return async (
+      req: Request,
+      res: Response,
+      _next: NextFunction,
+    ): Promise<void> => {
+      const result = resendOTPSchema.safeParse(req.body);
+      if (!result.success) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "Validation failed",
+          error: result.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      try {
+        const user = await UserModel.findOne({ email_id: req.body.user });
+        if (!user) {
+          res
+            .status(HttpStatus.BAD_REQUEST)
+            .json({ status: false, message: "Invalid email id" });
+          return;
+        }
+
+        const otp = generateOtp(6);
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        const updatedUser = await UserModel.update(user.id, {
+          otp,
+          otp_expiry: otpExpiry,
+        });
+
+        if (!updatedUser) {
+          res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            status: false,
+            message: "Something went wrong. OTP generation failed.",
+          });
+          return;
+        }
+
+        await (type === "reset"
+          ? sendPasswordResetOtpEmail(updatedUser.email_id, otp)
+          : otpLoginEmail(updatedUser.email_id, otp));
+
+        res.status(HttpStatus.OK).json({
+          status: true,
+          message: "OTP sent to your registered email id",
+          user: updatedUser.email_id,
+        });
+      } catch (error: any) {
+        console.error(error);
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          message: "Something went wrong, please try again after sometime",
+        });
+      }
+    };
   },
 };
