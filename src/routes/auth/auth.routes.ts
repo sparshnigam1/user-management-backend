@@ -30,4 +30,10 @@ authRoutes.post(
   asyncHandler(authController.resendOTP("login")),
 );
 
+authRoutes.post("/login-link", asyncHandler(authController.requestLoginLink));
+authRoutes.get(
+  "/login-link/verify",
+  asyncHandler(authController.verifyLoginLink),
+);
+
 export default authRoutes;

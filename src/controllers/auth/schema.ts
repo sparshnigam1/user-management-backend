@@ -54,6 +54,16 @@ export const resendOTPSchema = z.object({
 });
 export type resendOTPRequestBody = z.infer<typeof resendOTPSchema>;
 
+export const loginLinkRequestSchema = z.object({
+  email_id: z.string().trim().toLowerCase().email("Invalid email address"),
+});
+
+export const loginLinkVerifySchema = z.object({
+  token: z.string().min(1),
+});
+
+export type LoginLinkRequestBody = z.infer<typeof loginLinkRequestSchema>;
+
 // Response Schema
 // export const SignupUserResponseBodySchema = z.object({
 //   message: z.string(),

@@ -56,3 +56,14 @@ export const otpLoginEmail = async (
     `,
   });
 };
+
+export async function loginLinkEmail(email_id: string, link: string) {
+  return transporter.sendMail({
+    from: `"E-commerce" <${requireEnv("SMTP_FROM") || requireEnv("SMTP_USER")}>`,
+    to: email_id,
+    subject: "Your login link",
+    html: `<p>Click below to log in. This link expires in 15 minutes.</p>
+           <a href="${link}">Log in</a>
+           <p>If you didn't request this, ignore this email.</p>`,
+  });
+}

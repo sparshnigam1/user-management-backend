@@ -1,6 +1,8 @@
 import { jwtConfig, requireEnv } from "@/config/index.js";
 import {
   forgetPasswordSchema,
+  loginLinkRequestSchema,
+  loginLinkVerifySchema,
   loginSchema,
   resendOTPSchema,
   resetPasswordRequestBody,
@@ -10,12 +12,15 @@ import {
   verifyForgetPassOTPSchema,
 } from "@/controllers/auth/schema.js";
 import {
+  createLoginLinkToken,
   createToken,
   generateOtp,
   hashPassword,
+  verifyLoginLinkToken,
   verifyPassword,
 } from "@/helpers/authHelper.js";
 import {
+  loginLinkEmail,
   otpLoginEmail,
   passwordResetSuccessEmail,
   sendPasswordResetOtpEmail,
@@ -468,5 +473,99 @@ export const authController = {
         });
       }
     };
+  },
+
+  async requestLoginLink(req: Request, res: Response): Promise<void> {
+    const result = loginLinkRequestSchema.safeParse(req.body);
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Validation failed",
+        error: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    try {
+      const user = await UserModel.findOne({
+        email_id: req.body.email_id,
+      });
+
+      if (!user) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "Invalid email id",
+        });
+        return;
+      }
+
+      if (user) {
+        const token = createLoginLinkToken(user.email_id);
+        const frontendUrl = requireEnv("FRONTEND_BASE_URL");
+        const link = `${frontendUrl}/auth/login-link/verify?token=${encodeURIComponent(token)}`;
+        await loginLinkEmail(user.email_id, link);
+      }
+      res.status(HttpStatus.OK).json({
+        status: true,
+        message: "A login link has been sent",
+      });
+    } catch (error: any) {
+      console.error(error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: "Something went wrong, please try again after sometime",
+      });
+    }
+  },
+
+  async verifyLoginLink(req: Request, res: Response): Promise<void> {
+    const result = loginLinkVerifySchema.safeParse(req.query);
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Invalid or missing token",
+      });
+      return;
+    }
+
+    const payload = verifyLoginLinkToken(result.data.token);
+    if (!payload) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Link is invalid or has expired",
+      });
+      return;
+    }
+
+    try {
+      const user = await UserModel.findOne({ email_id: payload.email_id });
+      if (!user) {
+        res
+          .status(HttpStatus.BAD_REQUEST)
+          .json({ status: false, message: "Invalid user" });
+        return;
+      }
+
+      const cookieName = requireEnv("COOKIE_KEY");
+      const token = createToken({ user: user.email_id, role: user.role_id });
+      const tokenMaxAge = expiresInToMs(jwtConfig.jwtExpiresIn);
+
+      res.cookie(cookieName, token, getSessionCookieOptions(tokenMaxAge));
+      res.status(HttpStatus.OK).json({
+        status: true,
+        message: "Login successful",
+        user: {
+          id: user.id,
+          role_id: user.role_id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email_id: user.email_id,
+        },
+      });
+    } catch (error: any) {
+      console.error(error);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: "Something went wrong, please try again after sometime",
+      });
+    }
   },
 };

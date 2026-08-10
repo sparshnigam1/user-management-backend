@@ -1,4 +1,4 @@
-import { jwtConfig } from "@/config/index.js";
+import { jwtConfig, requireEnv } from "@/config/index.js";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
@@ -71,3 +71,23 @@ export const generateOtp = (length = 6): string => {
   }
   return otp;
 };
+
+const loginPurpose = requireEnv("LOGIN_LINK_PURPOSE");
+
+export function createLoginLinkToken(email_id: string): string {
+  return jwt.sign({ email_id, purpose: loginPurpose }, jwtConfig.jwtSecret, {
+    expiresIn: "15m",
+  });
+}
+
+export function verifyLoginLinkToken(
+  token: string,
+): { email_id: string } | null {
+  try {
+    const payload = jwt.verify(token, jwtConfig.jwtSecret) as jwt.JwtPayload;
+    if (payload.purpose !== loginPurpose || !payload.email_id) return null;
+    return { email_id: payload.email_id };
+  } catch {
+    return null; // expired or tampered
+  }
+}
