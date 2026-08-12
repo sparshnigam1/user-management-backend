@@ -389,6 +389,14 @@ export const authController = {
         return;
       }
 
+      if (!user.otp_expiry || new Date(user.otp_expiry) < new Date()) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          status: false,
+          message: "OTP has been expired",
+        });
+        return;
+      }
+
       if (user.otp !== req.body.otp) {
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
           status: false,
@@ -397,18 +405,42 @@ export const authController = {
         return;
       }
 
-      if (!user.otp_expiry || new Date(user.otp_expiry) < new Date()) {
-        res.status(HttpStatus.BAD_REQUEST).json({
+      const updateBody = {
+        otp: null,
+        otp_expiry: null,
+      };
+
+      const updatedUser = await UserModel.update(user.id, { ...updateBody });
+
+      if (!updatedUser) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
           status: false,
-          message: "OTP has expired",
+          message: "Something went wrong. Password reset failed.",
         });
         return;
       }
 
-      res.status(HttpStatus.OK).json({
-        status: true,
-        message: "login successful",
-      });
+      const parsedUser = {
+        id: user?.id,
+        role_id: user?.role_id,
+        first_name: user?.first_name,
+        last_name: user?.last_name,
+        email_id: user?.email_id,
+        phone_number: user?.phone_number,
+        gender: user?.gender,
+        created_at: user?.created_at,
+        updated_at: user?.updated_at,
+        is_locked: user?.is_locked,
+      };
+
+      const cookieName = requireEnv("COOKIE_KEY");
+      const token = createToken({ user: user?.email_id, role: user?.role_id });
+      const tokenMaxAge = expiresInToMs(jwtConfig.jwtExpiresIn);
+
+      res.cookie(cookieName, token, getSessionCookieOptions(tokenMaxAge));
+      res
+        .status(HttpStatus.OK)
+        .json({ message: "Login successful", user: parsedUser, token });
     } catch (error: any) {
       console.error(error);
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({

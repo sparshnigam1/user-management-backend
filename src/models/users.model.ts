@@ -2,7 +2,7 @@ import { query } from "@/config/db.js";
 
 export interface User {
   id: number;
-  role_id: number;
+  role_id: string;
   first_name: string;
   last_name?: string;
   email_id: string;
@@ -17,17 +17,17 @@ export interface User {
 }
 
 export interface CreateUserInput {
-  role_id: number;
+  role_id: string;
   first_name: string;
   last_name?: string;
   email_id: string;
   phone_number?: string;
-  password: string;
+  password?: string;
   gender?: string;
 }
 
 export interface UpdateUserInput {
-  role_id?: number;
+  role_id?: string;
   first_name: string;
   last_name?: string;
   email_id: string;
@@ -127,7 +127,7 @@ export const UserModel = {
         last_name ?? null,
         email_id,
         phone_number ?? null,
-        password,
+        password ?? null,
         gender ?? null,
       ],
     );

@@ -1,4 +1,7 @@
-import { NextFunction, Request, Response } from 'express';
+import { AppError, mapPgError } from "@/lib/errors/index.js";
+import { HttpStatus } from "@/lib/http/status.js";
+import { NextFunction, Request, Response } from "express";
+import { ZodError } from "zod";
 
 export class ApiError extends Error {
   statusCode: number;
@@ -11,26 +14,45 @@ export class ApiError extends Error {
 }
 
 export function notFoundHandler(req: Request, res: Response): void {
-  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+  res
+    .status(404)
+    .json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction): void {
-  const isApiError = err instanceof ApiError;
-  const statusCode = isApiError ? err.statusCode : 500;
-  const message = err instanceof Error ? err.message : 'Internal server error';
-
-  // Postgres unique_violation
-  const pgCode = (err as { code?: string })?.code;
-  if (pgCode === '23505') {
-    res.status(409).json({ error: 'A record with this value already exists.' });
+export function errorHandler(
+  error: unknown,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (error instanceof AppError) {
+    res.status(error.statusCode).json({
+      message: error.message,
+      ...(error.details ? { details: error.details } : {}),
+    });
     return;
   }
 
-  if (process.env.NODE_ENV !== 'test') {
-    // eslint-disable-next-line no-console
-    console.error(err);
+  // 2. Zod validation errors that slipped through as throws
+  if (error instanceof ZodError) {
+    res.status(HttpStatus.BAD_REQUEST).json({
+      message: "Validation failed",
+      errors: error.flatten().fieldErrors,
+    });
+    return;
   }
 
-  res.status(statusCode).json({ error: message });
+  // 3. Postgres driver errors
+  const pgError = mapPgError(error);
+  if (pgError) {
+    res.status(pgError.statusCode).json({ message: pgError.message });
+    return;
+  }
+
+  // 4. Unknown/unexpected — log full detail, return generic message
+  console.error("Unhandled error:", error);
+  res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+    message: "Something went wrong, please try again later",
+  });
 }

@@ -10,7 +10,7 @@ export enum ROLES_ENUM {
 }
 
 export interface Roles {
-  id: number;
+  id: string;
   name: ROLES_ENUM;
   description?: string;
 }

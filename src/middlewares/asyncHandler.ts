@@ -1,9 +1,9 @@
-import { NextFunction, Request, Response } from 'express';
+import { NextFunction, Request, Response } from "express";
 
 type AsyncRouteHandler = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => Promise<unknown>;
 
 /**
@@ -11,6 +11,7 @@ type AsyncRouteHandler = (
  * to next(err) instead of crashing the process or hanging the request.
  */
 export const asyncHandler =
-  (fn: AsyncRouteHandler) => (req: Request, res: Response, next: NextFunction) => {
+  (fn: AsyncRouteHandler) =>
+  (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
