@@ -26,6 +26,7 @@ export function errorHandler(
   res: Response,
   next: NextFunction,
 ): void {
+  // 1. Explicit AppError thrown somewhere in the app
   if (error instanceof AppError) {
     res.status(error.statusCode).json({
       message: error.message,

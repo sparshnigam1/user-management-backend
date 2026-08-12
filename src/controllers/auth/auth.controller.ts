@@ -118,7 +118,7 @@ export const authController = {
         gender: user?.gender,
         created_at: user?.created_at,
         updated_at: user?.updated_at,
-        is_locked: user?.is_locked,
+        status: user?.status,
       };
 
       const cookieName = requireEnv("COOKIE_KEY");
@@ -430,7 +430,7 @@ export const authController = {
         gender: user?.gender,
         created_at: user?.created_at,
         updated_at: user?.updated_at,
-        is_locked: user?.is_locked,
+        status: user?.status,
       };
 
       const cookieName = requireEnv("COOKIE_KEY");

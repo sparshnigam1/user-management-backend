@@ -7,6 +7,10 @@ import {
   createUserRequestBody,
   createUserSchema,
   getUserByIdParamsSchema,
+  updateUserRequestBody,
+  updateUserSchema,
+  updateUserStatusRequestBody,
+  updateUserStatusSchema,
 } from "./schema.js";
 
 export const userController = {
@@ -30,7 +34,7 @@ export const userController = {
         gender: user?.gender,
         created_at: user?.created_at,
         updated_at: user?.updated_at,
-        is_locked: user?.is_locked,
+        status: user?.status,
       }));
 
       res
@@ -78,7 +82,7 @@ export const userController = {
         gender: user?.gender,
         created_at: user?.created_at,
         updated_at: user?.updated_at,
-        is_locked: user?.is_locked,
+        status: user?.status,
       };
 
       res
@@ -125,5 +129,129 @@ export const userController = {
     res
       .status(HttpStatus.CREATED)
       .json({ message: "User created successfully", user });
+  },
+
+  async update(req: Request, res: Response): Promise<void> {
+    const reqID = getUserByIdParamsSchema.safeParse(req.params);
+
+    if (!reqID.success) {
+      res.status(400).json({
+        message: "Invalid User Id",
+        errors: reqID.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const result = updateUserSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message: "Validation failed",
+        errors: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    const user = await UserModel.findOne({
+      id: id as string,
+    });
+
+    if (!user) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message: "User not found",
+      });
+      return;
+    }
+
+    const input: updateUserRequestBody = result.data;
+
+    const hashedPassword = input.password
+      ? await hashPassword(input.password)
+      : undefined;
+
+    const updatedUser = await UserModel.update(user.id, {
+      ...input,
+      ...(!!input.password ? { password: hashedPassword } : {}),
+    });
+
+    if (!updatedUser) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        status: false,
+        message: "Something went wrong. Unable to update user.",
+      });
+      return;
+    }
+
+    res
+      .status(HttpStatus.CREATED)
+      .json({ message: "User updated successfully", user: updatedUser });
+  },
+
+  async updateStatus(req: Request, res: Response): Promise<void> {
+    const reqID = getUserByIdParamsSchema.safeParse(req.params);
+
+    if (!reqID.success) {
+      res.status(400).json({
+        message: "Invalid User Id",
+        errors: reqID.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const result = updateUserStatusSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message: "Validation failed",
+        errors: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    const user = await UserModel.findOne({
+      id: id as string,
+    });
+
+    if (!user) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message: "User not found",
+      });
+      return;
+    }
+
+    const input: updateUserStatusRequestBody = result.data;
+
+    const updatedUser = await UserModel.update(user.id, {
+      status: input.status,
+    });
+
+    if (!updatedUser) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        status: false,
+        message: "Something went wrong. Unable to update user status.",
+      });
+      return;
+    }
+
+    const parsedUser = {
+      id: user?.id,
+      role_id: user?.role_id,
+      first_name: user?.first_name,
+      last_name: user?.last_name,
+      email_id: user?.email_id,
+      phone_number: user?.phone_number,
+      gender: user?.gender,
+      created_at: user?.created_at,
+      updated_at: user?.updated_at,
+      status: user?.status,
+    };
+
+    res
+      .status(HttpStatus.CREATED)
+      .json({ message: "User status updated successfully", user: parsedUser });
   },
 };

@@ -1,4 +1,5 @@
 import { query } from "@/config/db.js";
+import { USER_STATUS } from "@/lib/types/user.js";
 
 export interface User {
   id: number;
@@ -11,7 +12,7 @@ export interface User {
   gender?: string;
   created_at: string;
   updated_at: string;
-  is_locked: boolean;
+  status: USER_STATUS;
   otp?: string | null;
   otp_expiry?: string | null;
 }
@@ -34,7 +35,7 @@ export interface UpdateUserInput {
   phone_number?: string;
   password: string;
   gender?: string;
-  is_locked?: boolean;
+  status?: boolean;
 }
 
 const ALLOWED_FIND_COLUMNS = [
@@ -48,7 +49,7 @@ const ALLOWED_FIND_COLUMNS = [
   "gender",
   "created_at",
   "updated_at",
-  "is_locked",
+  "status",
 ] as const;
 
 type FindableColumn = (typeof ALLOWED_FIND_COLUMNS)[number];
@@ -64,7 +65,7 @@ const ALLOWED_UPDATE_COLUMNS = [
   "password",
   "gender",
   "updated_at",
-  "is_locked",
+  "status",
   "otp",
   "otp_expiry",
 ] as const;
@@ -120,7 +121,7 @@ export const UserModel = {
     const result = await query<User>(
       `INSERT INTO users (role_id, first_name, last_name, email_id, phone_number, password, gender)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, role_id, first_name, last_name, email_id, phone_number, gender, created_at, updated_at, is_locked`,
+       RETURNING id, role_id, first_name, last_name, email_id, phone_number, gender, created_at, updated_at, status`,
       [
         role_id,
         first_name,
@@ -155,7 +156,7 @@ export const UserModel = {
       `UPDATE users
      SET ${setClause}, updated_at = NOW()
      WHERE id = $${entries.length + 1}
-     RETURNING id, role_id, first_name, last_name, email_id, phone_number, gender, created_at, updated_at, is_locked, otp, otp_expiry`,
+     RETURNING id, role_id, first_name, last_name, email_id, phone_number, gender, created_at, updated_at, status, otp, otp_expiry`,
       [...values, id],
     );
 

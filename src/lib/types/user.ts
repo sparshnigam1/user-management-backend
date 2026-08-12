@@ -3,3 +3,10 @@ export enum GENDER_ENUM {
   FEMALE = "female",
   OTHER = "other",
 }
+
+export enum USER_STATUS {
+  PENDING = "pending",
+  ACTIVE = "active",
+  INACTIVE = "inactive",
+  SUSPENDED = "suspended",
+}
