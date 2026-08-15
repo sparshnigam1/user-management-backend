@@ -4,6 +4,7 @@ import {
   reIssueToken,
   veriftToken,
 } from "@/helpers/authHelper.js";
+import { HttpStatus } from "@/lib/http/status.js";
 import { USER_STATUS } from "@/lib/types/user.js";
 import { UserModel } from "@/models/users.model.js";
 import { expiresInToMs, getSessionCookieOptions } from "@/utils/cookies.js";
@@ -35,16 +36,31 @@ export const authenticate = (
   const token = req.cookies?.[sessionCookieName];
 
   if (!token) {
-    return res.status(401).json({ error: "Session missing" });
+    return res
+      .status(HttpStatus.UNAUTHORIZED)
+      .json({ error: "Session missing" });
   }
 
   try {
     const decodedToken = veriftToken(token);
     req.session = decodedToken;
 
-    if (isTokenNearExpiry({ decodedToken })) {
+    if (!decodedToken.exp || !decodedToken.iat) {
+      return res.status(HttpStatus.UNAUTHORIZED).json({
+        status: false,
+        message: "Invalid token - Access Denied",
+      });
+    }
+
+    const tokenLifespanMs = (decodedToken.exp - decodedToken.iat) * 1000;
+    const refreshExpiryMs = expiresInToMs(jwtConfig.jwtRefreshExpiresIn);
+
+    const isRefreshTypeToken =
+      Math.abs(tokenLifespanMs - refreshExpiryMs) < 1000;
+
+    if (isTokenNearExpiry({ decodedToken }) && !isRefreshTypeToken) {
       const refreshedToken = reIssueToken(decodedToken);
-      const maxAge = expiresInToMs(jwtConfig.jwtExpiresIn);
+      const maxAge = expiresInToMs(jwtConfig.jwtRefreshExpiresIn);
       res.cookie(
         sessionCookieName,
         refreshedToken,
@@ -62,26 +78,30 @@ export const authenticate = (
 
     if (error.name === "TokenExpiredError") {
       return res
-        .status(401)
+        .status(HttpStatus.UNAUTHORIZED)
         .json({ status: false, message: "Session expired" });
     }
     if (error.name === "JsonWebTokenError") {
       return res
-        .status(401)
+        .status(HttpStatus.UNAUTHORIZED)
         .json({ status: false, message: "Invalid session" });
     }
-    // if (error.name === "NotBeforeError") {
-    //   return res.status(401).json({ status: false, message: "Token not active yet" });
-    // }
+    if (error.name === "NotBeforeError") {
+      return res
+        .status(HttpStatus.UNAUTHORIZED)
+        .json({ status: false, message: "Token not active yet" });
+    }
 
-    return res.status(401).json({ error: "Session validation failed" });
+    return res
+      .status(HttpStatus.UNAUTHORIZED)
+      .json({ error: "Session validation failed" });
   }
 };
 
-export const authorize = (...allowedRoles: string[]) => {
+export const authorize = ({ isRoleBased }: { isRoleBased?: boolean } = {}) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.session) {
-      return res.status(401).json({
+      return res.status(HttpStatus.UNAUTHORIZED).json({
         status: false,
         message: "Unauthenticated Access - Access Denied",
       });
@@ -92,8 +112,14 @@ export const authorize = (...allowedRoles: string[]) => {
       id: session.user,
       status: USER_STATUS.ACTIVE,
     });
+
+    if (!!isRoleBased) {
+    }
+
     if (!user || !user.length) {
-      return res.status(403).json({ error: "Insufficient permissions" });
+      return res
+        .status(HttpStatus.FORBIDDEN)
+        .json({ error: "Access denied. Unauthorized access." });
     }
 
     next();

@@ -17,9 +17,7 @@ import {
 export const userController = {
   async listAll(req: Request, res: Response): Promise<void> {
     try {
-      const users = await UserModel.conditionalFindAll({
-        not: { status: USER_STATUS.INACTIVE },
-      });
+      const users = await UserModel.findAll();
 
       if (!users) {
         res
@@ -262,7 +260,7 @@ export const userController = {
     const reqID = getUserByIdParamsSchema.safeParse(req.params);
 
     if (!reqID.success) {
-      res.status(400).json({
+      res.status(HttpStatus.OK).json({
         message: "Invalid User Id",
         errors: reqID.error.flatten().fieldErrors,
       });
@@ -276,6 +274,13 @@ export const userController = {
     });
 
     if (!user) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message: "User not found",
+      });
+      return;
+    }
+
+    if (user.status == USER_STATUS.INACTIVE) {
       res.status(HttpStatus.BAD_REQUEST).json({
         message: "User not found",
       });
@@ -308,7 +313,7 @@ export const userController = {
     };
 
     res
-      .status(HttpStatus.CREATED)
+      .status(HttpStatus.OK)
       .json({ message: "User deleted successfully", user: parsedUser });
   },
 

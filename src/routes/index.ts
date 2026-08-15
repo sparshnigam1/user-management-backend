@@ -1,4 +1,4 @@
-import { authenticate } from "@/middlewares/auth.js";
+import { authenticate, authorize } from "@/middlewares/auth.js";
 import crypto from "crypto";
 import { Request, Response, Router } from "express";
 import authRoutes from "./auth/auth.routes.js";
@@ -15,7 +15,7 @@ router.get("/", (_req: Request, res: Response) => {
 });
 
 router.use("/auth", authRoutes);
-router.use("/roles", authenticate, rolesRoutes);
-router.use("/users", authenticate, userRoutes);
+router.use("/roles", authenticate, authorize(), rolesRoutes);
+router.use("/users", authenticate, authorize(), userRoutes);
 
 export default router;

@@ -6,17 +6,17 @@ import { Router } from "express";
 const userRoutes = Router();
 
 userRoutes.post("/create", asyncHandler(userController.create));
-userRoutes.get("/", authorize(), asyncHandler(userController.listAll));
+userRoutes.get("/", asyncHandler(userController.listAll));
 userRoutes.get("/:id", asyncHandler(userController.getUserById));
 userRoutes.put("/:id/update-status", asyncHandler(userController.updateStatus));
 userRoutes.patch(
   "/:id/update",
-  authorize(),
+  authorize({ isRoleBased: true }),
   asyncHandler(userController.update),
 );
 userRoutes.delete(
   "/:id/delete",
-  authorize(),
+  authorize({ isRoleBased: true }),
   asyncHandler(userController.softDelete),
 );
 
