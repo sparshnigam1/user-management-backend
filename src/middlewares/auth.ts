@@ -4,6 +4,8 @@ import {
   reIssueToken,
   veriftToken,
 } from "@/helpers/authHelper.js";
+import { USER_STATUS } from "@/lib/types/user.js";
+import { UserModel } from "@/models/users.model.js";
 import { expiresInToMs, getSessionCookieOptions } from "@/utils/cookies.js";
 import { NextFunction, Request, Response } from "express";
 import { JwtPayload } from "jsonwebtoken";
@@ -77,24 +79,22 @@ export const authenticate = (
 };
 
 export const authorize = (...allowedRoles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.session) {
-      return res
-        .status(401)
-        .json({
-          status: false,
-          message: "Unauthenticated Access - Access Denied",
-        });
+      return res.status(401).json({
+        status: false,
+        message: "Unauthenticated Access - Access Denied",
+      });
     }
 
-    const role = req.session.role as string | undefined;
-
-    // console.log("--------------------------------------------------");
-    // console.log("role_id:",role);
-    // console.log("--------------------------------------------------");
-    // if (!role || !allowedRoles.includes(role)) {
-    //   return res.status(403).json({ error: "Insufficient permissions" });
-    // }
+    const session = req.session;
+    const user = await UserModel.conditionalFindAll({
+      id: session.user,
+      status: USER_STATUS.ACTIVE,
+    });
+    if (!user || !user.length) {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
 
     next();
   };

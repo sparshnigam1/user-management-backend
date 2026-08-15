@@ -56,6 +56,14 @@ type FindableColumn = (typeof ALLOWED_FIND_COLUMNS)[number];
 
 type FindParams = Partial<Record<FindableColumn, string | boolean>>;
 
+type ConditionalFindParams = Partial<
+  Record<FindableColumn, string | boolean>
+> & {
+  not?: Partial<
+    Record<FindableColumn, string | boolean | (string | boolean)[]>
+  >;
+};
+
 const ALLOWED_UPDATE_COLUMNS = [
   "role_id",
   "first_name",
@@ -82,6 +90,55 @@ type UpdateParams = Partial<
 export const UserModel = {
   async findAll(): Promise<User[] | undefined> {
     const result = await query<User>(`SELECT * FROM users`);
+
+    return result.rows;
+  },
+
+  async conditionalFindAll({
+    not,
+    ...eq
+  }: ConditionalFindParams): Promise<User[] | undefined> {
+    const eqEntries = Object.entries(eq).filter(([key]) =>
+      ALLOWED_FIND_COLUMNS.includes(key as FindableColumn),
+    );
+    const notEntries = Object.entries(not ?? {}).filter(([key]) =>
+      ALLOWED_FIND_COLUMNS.includes(key as FindableColumn),
+    );
+
+    if (eqEntries.length === 0 && notEntries.length === 0) {
+      throw new Error(
+        "conditionalFindAll() requires at least one valid field to match on",
+      );
+    }
+
+    const clauses: string[] = [];
+    const values: (string | boolean)[] = [];
+
+    eqEntries.forEach(([key, value]) => {
+      values.push(value);
+      clauses.push(`${key} = $${values.length}`);
+    });
+
+    notEntries.forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        // NOT IN (...) for multiple excluded values on the same column
+        const placeholders = value.map((v) => {
+          values.push(v);
+          return `$${values.length}`;
+        });
+        clauses.push(`${key} NOT IN (${placeholders.join(", ")})`);
+      } else {
+        values.push(value);
+        clauses.push(`${key} != $${values.length}`);
+      }
+    });
+
+    const whereClause = clauses.join(" AND ");
+
+    const result = await query<User>(
+      `SELECT * FROM users WHERE ${whereClause}`,
+      values,
+    );
 
     return result.rows;
   },
@@ -158,6 +215,17 @@ export const UserModel = {
      WHERE id = $${entries.length + 1}
      RETURNING id, role_id, first_name, last_name, email_id, phone_number, gender, created_at, updated_at, status, otp, otp_expiry`,
       [...values, id],
+    );
+
+    return result.rows[0];
+  },
+
+  async delete(id: number): Promise<User | undefined> {
+    const result = await query<User>(
+      `DELETE FROM users
+     WHERE id = $1
+     RETURNING id, role_id, first_name, last_name, email_id, phone_number, gender, created_at, updated_at, status`,
+      [id],
     );
 
     return result.rows[0];

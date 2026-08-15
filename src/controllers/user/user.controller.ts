@@ -1,5 +1,6 @@
 import { hashPassword } from "@/helpers/authHelper.js";
 import { HttpStatus } from "@/lib/http/status.js";
+import { USER_STATUS } from "@/lib/types/user.js";
 import { ROLES_ENUM, RolesModel } from "@/models/roles.model.js";
 import { UserModel } from "@/models/users.model.js";
 import { Request, Response } from "express";
@@ -16,7 +17,9 @@ import {
 export const userController = {
   async listAll(req: Request, res: Response): Promise<void> {
     try {
-      const users = await UserModel.findAll();
+      const users = await UserModel.conditionalFindAll({
+        not: { status: USER_STATUS.INACTIVE },
+      });
 
       if (!users) {
         res
@@ -253,5 +256,98 @@ export const userController = {
     res
       .status(HttpStatus.CREATED)
       .json({ message: "User status updated successfully", user: parsedUser });
+  },
+
+  async softDelete(req: Request, res: Response): Promise<void> {
+    const reqID = getUserByIdParamsSchema.safeParse(req.params);
+
+    if (!reqID.success) {
+      res.status(400).json({
+        message: "Invalid User Id",
+        errors: reqID.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    const user = await UserModel.findOne({
+      id: id as string,
+    });
+
+    if (!user) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message: "User not found",
+      });
+      return;
+    }
+
+    const inactiveUser = await UserModel.update(user.id, {
+      status: USER_STATUS.INACTIVE,
+    });
+
+    if (!inactiveUser) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        status: false,
+        message: "Something went wrong. Unable to delete user.",
+      });
+      return;
+    }
+
+    const parsedUser = {
+      id: inactiveUser?.id,
+      role_id: inactiveUser?.role_id,
+      first_name: inactiveUser?.first_name,
+      last_name: inactiveUser?.last_name,
+      email_id: inactiveUser?.email_id,
+      phone_number: inactiveUser?.phone_number,
+      gender: inactiveUser?.gender,
+      created_at: inactiveUser?.created_at,
+      updated_at: inactiveUser?.updated_at,
+      status: inactiveUser?.status,
+    };
+
+    res
+      .status(HttpStatus.CREATED)
+      .json({ message: "User deleted successfully", user: parsedUser });
+  },
+
+  async delete(req: Request, res: Response): Promise<void> {
+    const reqID = getUserByIdParamsSchema.safeParse(req.params);
+
+    if (!reqID.success) {
+      res.status(400).json({
+        message: "Invalid User Id",
+        errors: reqID.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    const user = await UserModel.findOne({
+      id: id as string,
+    });
+
+    if (!user) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message: "User not found",
+      });
+      return;
+    }
+
+    const deletedUser = await UserModel.delete(user.id);
+
+    if (!deletedUser) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        status: false,
+        message: "Something went wrong. Unable to delete user.",
+      });
+      return;
+    }
+
+    res
+      .status(HttpStatus.CREATED)
+      .json({ message: "User deleted successfully", user: deletedUser });
   },
 };

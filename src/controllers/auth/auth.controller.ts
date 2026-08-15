@@ -122,7 +122,7 @@ export const authController = {
       };
 
       const cookieName = requireEnv("COOKIE_KEY");
-      const token = createToken({ user: user?.email_id, role: user?.role_id });
+      const token = createToken({ user: user?.id, role: user?.role_id });
       const tokenMaxAge = expiresInToMs(jwtConfig.jwtExpiresIn);
 
       res.cookie(cookieName, token, getSessionCookieOptions(tokenMaxAge));
@@ -434,7 +434,7 @@ export const authController = {
       };
 
       const cookieName = requireEnv("COOKIE_KEY");
-      const token = createToken({ user: user?.email_id, role: user?.role_id });
+      const token = createToken({ user: user?.id, role: user?.role_id });
       const tokenMaxAge = expiresInToMs(jwtConfig.jwtExpiresIn);
 
       res.cookie(cookieName, token, getSessionCookieOptions(tokenMaxAge));
