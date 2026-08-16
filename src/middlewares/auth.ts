@@ -19,7 +19,7 @@ declare global {
   }
 }
 
-export const authenticate = (
+export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction,
@@ -50,6 +50,16 @@ export const authenticate = (
         status: false,
         message: "Invalid token - Access Denied",
       });
+    }
+    const user = await UserModel.conditionalFindAll({
+      id: decodedToken.user,
+      status: USER_STATUS.ACTIVE,
+    });
+
+    if (!user || !user.length) {
+      return res
+        .status(HttpStatus.FORBIDDEN)
+        .json({ error: "Access denied. Contact admin." });
     }
 
     const tokenLifespanMs = (decodedToken.exp - decodedToken.iat) * 1000;
@@ -108,18 +118,8 @@ export const authorize = ({ isRoleBased }: { isRoleBased?: boolean } = {}) => {
     }
 
     const session = req.session;
-    const user = await UserModel.conditionalFindAll({
-      id: session.user,
-      status: USER_STATUS.ACTIVE,
-    });
 
     if (!!isRoleBased) {
-    }
-
-    if (!user || !user.length) {
-      return res
-        .status(HttpStatus.FORBIDDEN)
-        .json({ error: "Access denied. Unauthorized access." });
     }
 
     next();
