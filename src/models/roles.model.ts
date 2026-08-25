@@ -1,4 +1,5 @@
 import { query } from "@/config/db.js";
+import { uuidv7 } from "uuidv7";
 
 export enum ROLES_ENUM {
   CUSTOMER = "customer",
@@ -13,6 +14,10 @@ export interface Roles {
   id: string;
   name: ROLES_ENUM;
   description?: string;
+  parent_id?: string;
+  status?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export const RolesModel = {
@@ -33,13 +38,40 @@ export const RolesModel = {
         "A super administrator with full platform access",
     };
 
-    const values = Object.values(ROLES_ENUM);
+    // parent hierarchy: super_admin -> admin -> manager -> staff
+    // customer & vendor have no parent
+    const roleParents: Record<ROLES_ENUM, ROLES_ENUM | null> = {
+      [ROLES_ENUM.SUPER_ADMIN]: null,
+      [ROLES_ENUM.ADMIN]: ROLES_ENUM.SUPER_ADMIN,
+      [ROLES_ENUM.MANAGER]: ROLES_ENUM.ADMIN,
+      [ROLES_ENUM.STAFF]: ROLES_ENUM.MANAGER,
+      [ROLES_ENUM.VENDOR]: null,
+      [ROLES_ENUM.CUSTOMER]: null,
+    };
 
+    const names = Object.values(ROLES_ENUM);
+    const ids = names.map(() => uuidv7());
+    const descriptions = names.map((n) => roleDescriptions[n]);
+
+    // Pass 1: insert all roles with generated ids (parent_id left null for now)
     await query(
-      `INSERT INTO roles (name, description)
-       SELECT * FROM UNNEST($1::text[], $2::text[])
+      `INSERT INTO roles (id, name, description)
+       SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[])
        ON CONFLICT (name) DO NOTHING`,
-      [values, values.map((v) => roleDescriptions[v])],
+      [ids, names, descriptions],
     );
+
+    // Pass 2: wire up parent_id now that every role row exists
+    for (const name of names) {
+      const parentName = roleParents[name];
+      if (!parentName) continue;
+
+      await query(
+        `UPDATE roles
+         SET parent_id = (SELECT id FROM roles WHERE name = $1)
+         WHERE name = $2`,
+        [parentName, name],
+      );
+    }
   },
 };

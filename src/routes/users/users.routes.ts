@@ -15,9 +15,14 @@ userRoutes.patch(
   asyncHandler(userController.update),
 );
 userRoutes.delete(
-  "/:id/delete",
+  "/:id/remove",
   authorize({ isRoleBased: true }),
   asyncHandler(userController.softDelete),
+);
+userRoutes.delete(
+  "/:id/delete",
+  authorize({ isRoleBased: true }),
+  asyncHandler(userController.delete),
 );
 
 export default userRoutes;
