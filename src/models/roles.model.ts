@@ -10,6 +10,11 @@ export enum ROLES_ENUM {
   SUPER_ADMIN = "super_admin",
 }
 
+export enum ROLE_STATUS_ENUM {
+  INACTIVE = 0,
+  ACTIVE = 1,
+}
+
 export interface Roles {
   id: string;
   name: ROLES_ENUM;
@@ -57,6 +62,17 @@ interface AssignRoleParams {
   roleId: string;
   userId: string;
   assignedBy: string;
+}
+
+interface UpdateRoleParams {
+  roleId: string;
+  updatedBy: string;
+  updates: Partial<{
+    name: string;
+    description: string;
+    status: number;
+    parentId: string | null;
+  }>;
 }
 
 export const RolesModel = {
@@ -300,6 +316,112 @@ export const RolesModel = {
       `,
       [roleId, userId, assignedBy],
     );
+  },
+
+  async update({
+    roleId,
+    updatedBy,
+    updates,
+  }: UpdateRoleParams): Promise<Roles> {
+    // 1. Find the role
+    const roleResult = await query<Roles>(
+      `
+    SELECT
+      id,
+      name,
+      description,
+      parent_id,
+      created_by,
+      is_system_role,
+      status
+    FROM roles
+    WHERE id = $1
+    LIMIT 1
+    `,
+      [roleId],
+    );
+
+    const role = roleResult.rows[0];
+
+    if (!role) {
+      throw new Error("Role not found");
+    }
+
+    // 2. System roles cannot be modified
+    if (role.is_system_role) {
+      throw new Error("System roles cannot be modified");
+    }
+
+    // 3. Check whether updatedBy is Super Admin
+    const superAdminResult = await query<{ exists: boolean }>(
+      `
+    SELECT EXISTS (
+      SELECT 1
+      FROM users u
+      INNER JOIN roles r
+        ON r.id = u.role_id
+      WHERE
+        u.id = $1
+        AND r.name = $2
+    ) AS exists
+    `,
+      [updatedBy, ROLES_ENUM.SUPER_ADMIN],
+    );
+
+    const isSuperAdmin = superAdminResult.rows[0]?.exists ?? false;
+
+    // 4. Only creator or Super Admin can update
+    if (!isSuperAdmin && role.created_by !== updatedBy) {
+      throw new Error("You are not authorized to update this role");
+    }
+
+    // 5. Allowed fields
+    const allowedFields = {
+      name: "name",
+      description: "description",
+      status: "status",
+      parentId: "parent_id",
+    } as const;
+
+    // 6. Convert API field names to database columns
+    const fields: string[] = [];
+    const values: (string | number | null)[] = [];
+
+    for (const [key, value] of Object.entries(updates)) {
+      const column = allowedFields[key as keyof typeof allowedFields];
+
+      if (!column) {
+        continue;
+      }
+
+      values.push(value as string | number | null);
+      fields.push(`${column} = $${values.length}`);
+    }
+
+    // 7. Make sure something is being updated
+    if (fields.length === 0) {
+      throw new Error(
+        "At least one valid field is required to update the role",
+      );
+    }
+
+    // 8. Always update updated_at
+    fields.push("updated_at = NOW()");
+
+    // 9. roleId placeholder comes after update values
+    values.push(roleId);
+
+    const result = await query<Roles>(
+      `
+    UPDATE roles
+    SET ${fields.join(", ")}
+    WHERE id = $${values.length}
+    RETURNING *;
+    `,
+      values,
+    );
+
+    return result.rows[0];
   },
 
   async seed(): Promise<void> {

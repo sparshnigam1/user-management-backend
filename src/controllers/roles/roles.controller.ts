@@ -6,6 +6,8 @@ import {
   createRoleRequestBody,
   createRoleSchema,
   getRoleByIdParamsSchema,
+  updateRoleSchema,
+  updateRoleStatusSchema,
 } from "./schema.js";
 
 export const rolesController = {
@@ -110,6 +112,113 @@ export const rolesController = {
 
       const message =
         error instanceof Error ? error.message : "Failed to assign role";
+
+      res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message,
+      });
+    }
+  },
+
+  async update(req: Request, res: Response): Promise<void> {
+    try {
+      const { user }: any = req.session;
+
+      const paramsResult = getRoleByIdParamsSchema.safeParse(req.params);
+      const bodyResult = updateRoleSchema.safeParse(req.body);
+
+      if (!paramsResult.success) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: "Validation failed",
+          errors: paramsResult.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      if (!bodyResult.success) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: "Validation failed",
+          errors: bodyResult.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      const { id: roleId } = paramsResult.data;
+
+      const role = await RolesModel.update({
+        roleId,
+        updatedBy: user,
+        updates: {
+          name: bodyResult.data.name,
+          description: bodyResult.data.description,
+        },
+      });
+
+      res.status(HttpStatus.OK).json({
+        success: true,
+        message: "Role updated successfully",
+        data: role,
+      });
+    } catch (error) {
+      console.error("Update role error:", error);
+
+      const message =
+        error instanceof Error ? error.message : "Failed to update role";
+
+      res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message,
+      });
+    }
+  },
+
+  async updateStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const { user }: any = req.session;
+
+      const paramsResult = getRoleByIdParamsSchema.safeParse(req.params);
+      const bodyResult = updateRoleStatusSchema.safeParse(req.body);
+
+      if (!paramsResult.success) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: "Validation failed",
+          errors: paramsResult.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      if (!bodyResult.success) {
+        res.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: "Validation failed",
+          errors: bodyResult.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      const { id: roleId } = paramsResult.data;
+
+      const role = await RolesModel.update({
+        roleId,
+        updatedBy: user,
+        updates: {
+          status: bodyResult.data.status,
+        },
+      });
+
+      res.status(HttpStatus.OK).json({
+        success: true,
+        message: "Role status updated successfully",
+        data: role,
+      });
+    } catch (error) {
+      console.error("Update role status error:", error);
+
+      const message =
+        error instanceof Error ? error.message : "Failed to update role status";
 
       res.status(HttpStatus.BAD_REQUEST).json({
         success: false,
