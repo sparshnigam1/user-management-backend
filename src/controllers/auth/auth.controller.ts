@@ -46,7 +46,7 @@ export const authController = {
     const input: SignupRequestBody = result.data;
 
     try {
-      const roles = await RolesModel.list();
+      const roles = await RolesModel.findAll();
       const customerRole = roles.find(
         ({ name }) => name === ROLES_ENUM.CUSTOMER,
       );

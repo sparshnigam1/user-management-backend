@@ -108,7 +108,7 @@ export const userController = {
 
     const input: createUserRequestBody = result.data;
 
-    const roles = await RolesModel.list();
+    const roles = await RolesModel.findAll();
     const customerRole = roles.find(({ name }) => name === ROLES_ENUM.CUSTOMER);
     if (!customerRole) {
       res
